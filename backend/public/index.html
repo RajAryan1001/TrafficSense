@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <title>भोपाल ट्रैफिक मॉनिटर</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .card { border: 1px solid #ccc; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .high { border-left: 5px solid red; }
+        .medium { border-left: 5px solid orange; }
+        .low { border-left: 5px solid green; }
+        #routeForm { margin: 20px 0; }
+        input { padding: 5px; margin: 5px; }
+        button { padding: 5px 10px; }
+        #routeData { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>भोपाल रीयल-टाइम ट्रैफिक डेटा</h1>
+    
+    <div id="routeForm">
+        <h3>रूट कैलकुलेट करें</h3>
+        <input type="text" id="origin" placeholder="प्रारंभ (e.g., MP Nagar, Bhopal)" value="MP Nagar, Bhopal">
+        <input type="text" id="destination" placeholder="गंतव्य (e.g., Indrapuri, Bhopal)" value="Indrapuri, Bhopal">
+        <button onclick="requestRoute()">रूट प्राप्त करें</button>
+    </div>
+    
+    <div id="routeData"></div>
+    
+    <div id="trafficData"></div>
+    <div id="accidentData"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        function requestRoute() {
+            const origin = document.getElementById('origin').value;
+            const destination = document.getElementById('destination').value;
+            socket.emit('requestRouteUpdate', { origin, destination });
+        }
+        
+        socket.on('routeUpdate', (data) => {
+            console.log('रूट अपडेट प्राप्त:', data);
+            if (!data.success) {
+                document.getElementById('routeData').innerHTML = '<h2>रूट त्रुटि</h2><p>' + (data.error || 'अज्ञात त्रुटि') + '</p>';
+                return;
+            }
+            let routeHtml = '<h2>रूट विवरण (' + data.origin + ' -> ' + data.destination + ')</h2>';
+            routeHtml += '<p>कुल दुर्घटनाएं: ' + data.accidentCount + '</p>';
+            routeHtml += '<p>रूट पर दुर्घटनाएं: ' + data.totalAccidentsInRoutes + '</p>';
+            data.data.forEach((route, index) => {
+                routeHtml += `
+                    <div class="card ${route.congestionLevel}">
+                        <h3>विकल्प ${index + 1}</h3>
+                        <p>दूरी: ${route.distance.text}</p>
+                        <p>समय: ${route.duration.text} (ट्रैफिक में: ${route.duration_in_traffic.text})</p>
+                        <p>कंजेशन: ${route.congestionLevel} (${route.routeCharacter})</p>
+                        <p>रूट पर दुर्घटनाएं: ${route.accidentsInWay || 0}</p>
+                    </div>
+                `;
+            });
+            document.getElementById('routeData').innerHTML = routeHtml;
+        });
+        
+        socket.on('trafficUpdate', (data) => {
+            console.log('ट्रैफिक अपडेट प्राप्त:', data);
+            
+            const trafficHtml = data.traffic.map(item => `
+                <div class="card ${item.congestionLevel}">
+                    <h3>${item.location}</h3>
+                    <p>यातायात: ${item.congestionLevel}</p>
+                    <p>वाहन: ${item.vehiclesCount}</p>
+                    <p>गति: ${item.averageSpeed} km/h</p>
+                    <p>समय: ${new Date(item.timestamp).toLocaleTimeString('hi-IN')}</p>
+                </div>
+            `).join('');
+            
+            document.getElementById('trafficData').innerHTML = '<h2>ट्रैफिक स्थिति</h2>' + trafficHtml;
+            
+            const accidentHtml = data.accidents.map(item => `
+                <div class="card ${item.severity}">
+                    <h3>${item.location}</h3>
+                    <p>विवरण: ${item.description}</p>
+                    <p>गंभीरता: ${item.severity}</p>
+                    <p>समय: ${new Date(item.timestamp).toLocaleTimeString('hi-IN')}</p>
+                </div>
+            `).join('');
+            
+            document.getElementById('accidentData').innerHTML = '<h2>दुर्घटना रिपोर्ट</h2>' + accidentHtml;
+        });
+        
+        socket.on('connect', () => {
+            console.log('WebSocket से जुड़ा');
+            requestRoute();
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('WebSocket डिस्कनेक्ट');
+        });
+    </script>
+</body>
+</html>
