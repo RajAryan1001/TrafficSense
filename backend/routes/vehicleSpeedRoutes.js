@@ -8,7 +8,7 @@ const {
   getVehicleSpeedsInArea,
   updateVehicle,
   deleteVehicle
-} = require('../controllers/VehicleSpeedController');
+} = require('../controllers/vehicleSpeedController');
 
 // POST /api/vehicles - Create/Update vehicle speed
 router.post('/', updateVehicleSpeed);
